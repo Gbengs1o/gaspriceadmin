@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { PlusCircle, MoreHorizontal, File, Loader2, Search } from "lucide-react"
+import Link from "next/link"
+import { PlusCircle, MoreHorizontal, File, Loader2, Search, MapIcon } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { useDebounce } from "@/hooks/use-debounce" 
@@ -135,6 +136,9 @@ export default function StationsPage() {
           <p className="text-muted-foreground">Search and manage all stations in the system.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/dashboard/stations/map">
+            <Button variant="outline"><MapIcon className="mr-2 h-4 w-4" /> View Map</Button>
+          </Link>
           <Button variant="outline" disabled><File className="mr-2 h-4 w-4" /> Export</Button>
           <Button onClick={() => openFormDialog()}><PlusCircle className="mr-2 h-4 w-4" /> Add Station</Button>
         </div>
@@ -240,11 +244,22 @@ export default function StationsPage() {
       </Dialog>
 
       <AlertDialog open={!!stationToDelete} onOpenChange={() => setStationToDelete(null)}>
-        {/* ... Delete confirmation ... */}
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the station
+                    and its associated data from our servers.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteStation}>Continue</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
       </AlertDialog>
     </div>
   )
 }
 
-// NOTE: Ensure you have the useDebounce hook in `hooks/use-debounce.ts`
     
