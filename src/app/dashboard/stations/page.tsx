@@ -41,7 +41,7 @@ export default function StationsPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearchTerm = useDebounce(searchTerm, 400);
-  const [brandFilter, setBrandFilter] = useState("");
+  const [brandFilter, setBrandFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState("newest");
   const [allBrands, setAllBrands] = useState<string[]>([]);
@@ -73,7 +73,7 @@ export default function StationsPage() {
     if (debouncedSearchTerm) {
         query = query.or(`name.ilike.%${debouncedSearchTerm}%,address.ilike.%${debouncedSearchTerm}%`);
     }
-    if (brandFilter) {
+    if (brandFilter && brandFilter !== 'all') {
         query = query.eq('brand', brandFilter);
     }
     if (statusFilter !== 'all') {
@@ -190,7 +190,7 @@ export default function StationsPage() {
             </div>
             <Select value={brandFilter} onValueChange={setBrandFilter}>
               <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Brands" /></SelectTrigger>
-              <SelectContent><SelectItem value="">All Brands</SelectItem>{allBrands.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
+              <SelectContent><SelectItem value="all">All Brands</SelectItem>{allBrands.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Statuses" /></SelectTrigger>
