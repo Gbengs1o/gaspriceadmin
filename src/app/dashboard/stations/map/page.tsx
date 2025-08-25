@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { APIProvider, Map, AdvancedMarker, Pin } from "@vis.gl/react-google-maps"
+import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow } from "@vis.gl/react-google-maps"
 import { supabase } from "@/lib/supabase"
 import { Loader2 } from "lucide-react"
 
 interface Station {
     id: number
     name: string
+    address: string | null
     latitude: number
     longitude: number
 }
@@ -19,7 +20,8 @@ export default function StationsMapPage() {
     const [stations, setStations] = useState<Station[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    
+    const [openInfoWindowId, setOpenInfoWindowId] = useState<number | null>(null);
+
     // IMPORTANT: You need to create a .env.local file and add your Google Maps API Key
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
@@ -31,7 +33,7 @@ export default function StationsMapPage() {
             // Fetch all stations with valid latitude and longitude
             const { data, error } = await supabase
                 .from('stations')
-                .select('id, name, latitude, longitude')
+                .select('id, name, address, latitude, longitude')
                 .not('latitude', 'is', null)
                 .not('longitude', 'is', null)
 
@@ -82,17 +84,29 @@ export default function StationsMapPage() {
                         defaultCenter={NIGERIA_CENTER}
                         defaultZoom={6}
                         gestureHandling={'greedy'}
-                        disableDefaultUI={true}
+                        disableDefaultUI={false}
                         mapId="gasprice-nigeria-map"
                     >
                         {stations.map((station) => (
-                            <AdvancedMarker
-                                key={station.id}
-                                position={{ lat: station.latitude, lng: station.longitude }}
-                                title={station.name}
-                            >
-                                <Pin />
-                            </AdvancedMarker>
+                           <React.Fragment key={station.id}>
+                               <AdvancedMarker
+                                   position={{ lat: station.latitude, lng: station.longitude }}
+                                   onClick={() => setOpenInfoWindowId(station.id)}
+                               >
+                                   <Pin />
+                               </AdvancedMarker>
+                               {openInfoWindowId === station.id && (
+                                    <InfoWindow
+                                        position={{ lat: station.latitude, lng: station.longitude }}
+                                        onCloseClick={() => setOpenInfoWindowId(null)}
+                                    >
+                                        <div className="p-2">
+                                            <p className="font-bold">{station.name}</p>
+                                            <p className="text-sm">{station.address || "No address provided"}</p>
+                                        </div>
+                                    </InfoWindow>
+                               )}
+                           </React.Fragment>
                         ))}
                     </Map>
                 </APIProvider>
@@ -100,5 +114,3 @@ export default function StationsMapPage() {
         </div>
     )
 }
-
-    
