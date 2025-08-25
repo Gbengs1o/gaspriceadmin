@@ -3,7 +3,7 @@
 "use client"
 
 import * as React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow } from "@vis.gl/react-google-maps"
 import { supabase } from "@/lib/supabase"
@@ -21,7 +21,7 @@ interface MapStation {
     longitude: number
     brand: string | null
     is_active: boolean
-    submission_count: number
+    submission_count: number // We will fetch this separately
 }
 
 // Center of Nigeria
@@ -40,18 +40,37 @@ export default function StationsMapPage() {
             setLoading(true)
             setError(null)
             
-            // --- THE FIX: Fetch data from our new, efficient VIEW ---
-            const { data, error } = await supabase
-                .from('stations_map_details') // Querying the view
-                .select('*')
+            // --- THE FIX: Fetch directly from the 'stations' table ---
+            const { data: stationData, error: stationError } = await supabase
+                .from('stations')
+                .select('id, name, address, latitude, longitude, brand, is_active')
+                .not('latitude', 'is', null)
+                .not('longitude', 'is', null)
 
-            if (error) {
-                console.error("Error fetching station locations:", error.message)
-                setError("Failed to load station data. Ensure the 'stations_map_details' VIEW exists.")
+            if (stationError) {
+                console.error("Error fetching station locations:", stationError)
+                setError("Failed to load station data from the 'stations' table.")
                 setStations([])
-            } else {
-                setStations(data as MapStation[])
+                setLoading(false)
+                return;
             }
+
+            // Now, fetch submission counts for the retrieved stations
+            const stationsWithCounts = await Promise.all(
+                stationData.map(async (station) => {
+                    const { count } = await supabase
+                        .from('price_reports')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('station_id', station.id);
+                    
+                    return {
+                        ...station,
+                        submission_count: count ?? 0
+                    };
+                })
+            );
+
+            setStations(stationsWithCounts as MapStation[])
             setLoading(false)
         }
 
@@ -62,6 +81,12 @@ export default function StationsMapPage() {
             fetchStations()
         }
     }, [apiKey])
+
+    // Memoize the selected station to avoid re-finding it on every render
+    const selectedStation = useMemo(() => {
+        if (!openInfoWindowId) return null;
+        return stations.find(s => s.id === openInfoWindowId);
+    }, [openInfoWindowId, stations]);
 
     if (loading) {
         return (
@@ -107,40 +132,34 @@ export default function StationsMapPage() {
                                key={station.id}
                                position={{ lat: station.latitude, lng: station.longitude }}
                                onClick={() => setOpenInfoWindowId(station.id)}
-                               title={station.name} // This adds a native browser tooltip on hover!
+                               title={station.name} // Native browser tooltip on hover
                            >
-                               {/* --- IMPROVEMENT: Color-coded pins --- */}
                                <Pin 
-                                 background={station.is_active ? '#10B981' : '#6B7280'} // Green for active, Gray for inactive
+                                 background={station.is_active ? '#10B981' : '#6B7280'}
                                  borderColor={station.is_active ? '#059669' : '#4B5563'}
                                  glyphColor={"#ffffff"}
                                />
                            </AdvancedMarker>
                         ))}
                         
-                        {/* Logic to show the InfoWindow for the selected station */}
-                        {openInfoWindowId && stations.find(s => s.id === openInfoWindowId) && (
+                        {selectedStation && (
                             <InfoWindow
-                                position={{ 
-                                    lat: stations.find(s => s.id === openInfoWindowId)!.latitude, 
-                                    lng: stations.find(s => s.id === openInfoWindowId)!.longitude 
-                                }}
+                                position={{ lat: selectedStation.latitude, lng: selectedStation.longitude }}
                                 onCloseClick={() => setOpenInfoWindowId(null)}
-                                pixelOffset={[0, -35]} // Adjust position to be above the pin
+                                pixelOffset={[0, -35]}
                             >
-                                {/* --- IMPROVEMENT: Enhanced InfoWindow Content --- */}
                                 <div className="p-1 max-w-sm">
-                                    <h3 className="font-bold text-base mb-1">{stations.find(s => s.id === openInfoWindowId)!.name}</h3>
-                                    <p className="text-sm text-muted-foreground mb-2">{stations.find(s => s.id === openInfoWindowId)!.address || "No address"}</p>
-                                    <div className="flex items-center justify-between mb-3 text-xs">
-                                        <Badge variant={stations.find(s => s.id === openInfoWindowId)!.is_active ? "default" : "secondary"}>
-                                            {stations.find(s => s.id === openInfoWindowId)!.is_active ? "Active" : "Inactive"}
+                                    <h3 className="font-bold text-base mb-1">{selectedStation.name}</h3>
+                                    <p className="text-sm text-muted-foreground mb-2">{selectedStation.address || "No address"}</p>
+                                    <div className="flex items-center justify-between mb-3 text-xs gap-2">
+                                        <Badge variant={selectedStation.is_active ? "default" : "secondary"}>
+                                            {selectedStation.is_active ? "Active" : "Inactive"}
                                         </Badge>
-                                        {stations.find(s => s.id === openInfoWindowId)!.brand && <Badge variant="outline">{stations.find(s => s.id === openInfoWindowId)!.brand}</Badge>}
-                                        <span className="text-muted-foreground">{stations.find(s => s.id === openInfoWindowId)!.submission_count} submissions</span>
+                                        {selectedStation.brand && <Badge variant="outline">{selectedStation.brand}</Badge>}
+                                        <span className="text-muted-foreground whitespace-nowrap">{selectedStation.submission_count} submissions</span>
                                     </div>
                                     <a
-                                        href={`https://www.google.com/maps/search/?api=1&query=${stations.find(s => s.id === openInfoWindowId)!.latitude},${stations.find(s => s.id === openInfoWindowId)!.longitude}`}
+                                        href={`https://www.google.com/maps/search/?api=1&query=${selectedStation.latitude},${selectedStation.longitude}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                     >
