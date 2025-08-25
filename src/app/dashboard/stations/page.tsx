@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { PlusCircle, MoreHorizontal, File, Loader2, Search } from "lucide-react"
 import { supabase } from "@/lib/supabase"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 // A common hook for search inputs, we'll need to create this file.
 import { useDebounce } from "@/hooks/use-debounce" 
 
