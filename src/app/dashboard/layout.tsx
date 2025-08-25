@@ -81,7 +81,7 @@ export default function DashboardLayout({
           <SidebarMenu>
             {navItems.map((item) => (
               <SidebarMenuItem key={item.href}>
-                <Link href={item.href} legacyBehavior passHref>
+                <Link href={item.href}>
                   <SidebarMenuButton
                     isActive={pathname === item.href}
                     tooltip={{ children: item.label, side: "right", align: "center" }}
@@ -97,8 +97,8 @@ export default function DashboardLayout({
         <SidebarFooter>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <div className="flex items-center gap-3 p-2 cursor-pointer rounded-md hover:bg-sidebar-accent">
-                    <Avatar className="h-9 w-9">
+                <div className="p-2 cursor-pointer rounded-md hover:bg-sidebar-accent flex items-center gap-3">
+                    <Avatar className="w-9 h-9">
                       <AvatarImage src="https://placehold.co/100x100.png" alt="@admin" />
                       <AvatarFallback>AD</AvatarFallback>
                     </Avatar>
@@ -122,9 +122,9 @@ export default function DashboardLayout({
       <SidebarInset>
         <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
           <SidebarTrigger className="sm:hidden" />
-          <div className="ml-auto flex items-center gap-2">
-            <Button variant="outline" size="icon" className="h-8 w-8">
-                <Bell className="h-4 w-4" />
+          <div className="flex items-center gap-2 ml-auto">
+            <Button variant="outline" size="icon" className="w-8 h-8">
+                <Bell className="w-4 h-4" />
                 <span className="sr-only">Toggle notifications</span>
             </Button>
           </div>

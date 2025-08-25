@@ -1,8 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Activity, ArrowUpRight, Fuel, Users, FileText, CheckCheck } from "lucide-react"
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
+import { Fuel, Users, FileText, CheckCheck } from "lucide-react"
+import { Area, AreaChart, Bar, BarChart, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
+import { format } from "date-fns" // A great library for formatting dates
+
+// 1. Make sure you have a Supabase client file at this path
 import { supabase } from "@/lib/supabase"
 
 import {
@@ -21,26 +24,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
 
-interface Submission {
-  station: string
-  price: number
-  status: 'Approved' | 'Pending' | 'Flagged'
-  date: string
-  stations?: { name: string, location: string } | null
-  created_at: string
-}
-
-const chartData = [
-  { month: "Jan", price: 186 },
-  { month: "Feb", price: 205 },
-  { month: "Mar", price: 237 },
-  { month: "Apr", price: 210 },
-  { month: "May", price: 250 },
-  { month: "Jun", price: 275 },
-]
-
+// --- Mock Data for the Region Chart (until you add a 'state' column) ---
 const regionData = [
     { region: "Lagos", submissions: 45 },
     { region: "Abuja", submissions: 32 },
@@ -49,70 +34,110 @@ const regionData = [
     { region: "Oyo", submissions: 22 },
 ]
 
+// --- Define Types for our Fetched Data ---
+interface Stats {
+  totalStations: number;
+  activeUsers: number;
+  totalSubmissions: number;
+}
+interface RecentSubmission {
+  stationName: string;
+  price: number;
+  date: string;
+}
+interface MonthlyPrice {
+  month: string;
+  price: number;
+}
+
+
 export default function DashboardPage() {
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ totalStations: 0, activeUsers: 0, pendingSubmissions: 0, reportsGenerated: 89 });
-  const [recentSubmissions, setRecentSubmissions] = useState<Submission[]>([]);
+  // 2. State variables to hold real data and loading status
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [recentSubmissions, setRecentSubmissions] = useState<RecentSubmission[]>([]);
+  const [priceTrendData, setPriceTrendData] = useState<MonthlyPrice[]>([]);
 
+  // 3. useEffect to fetch all dashboard data on component load
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // These queries assume you have tables named 'stations', 'profiles', and 'submissions'
-        // and that 'submissions' has a foreign key to 'stations'.
-        const stationPromise = supabase.from('stations').select('*', { count: 'exact', head: true });
-        const userPromise = supabase.from('profiles').select('*', { count: 'exact', head: true });
-        const pendingPromise = supabase.from('submissions').select('*', { count: 'exact', head: true }).eq('status', 'Pending');
-        
-        const submissionsPromise = supabase
-          .from('submissions')
-          .select(`
-            price,
-            status,
-            created_at,
-            stations ( name, location ) 
-          `)
-          .order('created_at', { ascending: false })
-          .limit(5);
-
-        const [
-            { count: stationCount }, 
-            { count: userCount }, 
-            { count: pendingCount },
-            { data: submissionsData, error: submissionsError }
-        ] = await Promise.all([stationPromise, userPromise, pendingPromise, submissionsPromise]);
+    const fetchDashboardData = async () => {
+      setIsLoading(true);
       
-        setStats(prev => ({
-          ...prev,
-          totalStations: stationCount ?? 0,
-          activeUsers: userCount ?? 0,
-          pendingSubmissions: pendingCount ?? 0,
+      // --- Fetching Data for the Stat Cards ---
+      const stationCountPromise = supabase.from('stations').select('*', { count: 'exact', head: true });
+      const userCountPromise = supabase.from('profiles').select('*', { count: 'exact', head: true });
+      const submissionCountPromise = supabase.from('price_reports').select('*', { count: 'exact', head: true });
+
+      // --- Fetching Data for the Recent Submissions Table ---
+      const recentSubmissionsPromise = supabase
+        .from('price_reports')
+        .select(`
+          price,
+          created_at,
+          stations ( name, address ) 
+        `)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      // --- Fetching Data for the Price Trend Chart via RPC ---
+      const priceTrendPromise = supabase.rpc('get_monthly_avg_price');
+
+      // --- Run all queries in parallel for speed ---
+      const [
+        { count: stationCount },
+        { count: userCount },
+        { count: submissionCount },
+        { data: submissionsData, error: submissionsError },
+        { data: trendData, error: trendError }
+      ] = await Promise.all([
+        stationCountPromise,
+        userCountPromise,
+        submissionCountPromise,
+        recentSubmissionsPromise,
+        priceTrendPromise
+      ]);
+
+      // --- Process and set state for all fetched data ---
+      setStats({
+        totalStations: stationCount ?? 0,
+        activeUsers: userCount ?? 0,
+        totalSubmissions: submissionCount ?? 0,
+      });
+
+      if (submissionsData) {
+        const formattedSubmissions = submissionsData.map((s: any) => ({
+            stationName: s.stations ? `${s.stations.name}, ${s.stations.address || ''}`.replace(/, $/, '') : 'Unknown Station',
+            price: s.price,
+            date: format(new Date(s.created_at), "MMM d, h:mm a"),
         }));
-
-        if (submissionsData) {
-          const formattedSubmissions = submissionsData.map((s: any) => ({
-              station: s.stations ? `${s.stations.name}, ${s.stations.location}` : 'Unknown Station',
-              price: s.price,
-              status: s.status,
-              date: new Date(s.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              created_at: s.created_at,
-          }));
-          setRecentSubmissions(formattedSubmissions);
-        }
-        if (submissionsError) console.error("Error fetching submissions:", submissionsError);
-
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setLoading(false);
+        setRecentSubmissions(formattedSubmissions);
       }
+      if (submissionsError) console.error("Error fetching submissions:", submissionsError.message);
+
+      if (trendData) {
+        const formattedTrendData = trendData.map((d: any) => ({
+            month: format(new Date(d.month_start), 'MMM'),
+            price: parseFloat(d.average_price).toFixed(2),
+        }));
+        setPriceTrendData(formattedTrendData);
+      }
+      if (trendError) console.error("Error fetching price trend:", trendError.message);
+      
+      setIsLoading(false);
     };
 
-    fetchData();
-  }, []);
+    fetchDashboardData();
+  }, []); // Empty dependency array means this runs once on mount
+
+
+  // 4. Render a loading state while fetching data
+  if (isLoading || !stats) {
+    return <div className="p-4">Loading Dashboard...</div>;
+  }
 
   return (
     <div className="flex flex-col gap-4">
+      {/* --- Stat Cards Using Real Data --- */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -120,8 +145,8 @@ export default function DashboardPage() {
             <Fuel className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {loading ? <Skeleton className="h-8 w-24" /> : <div className="text-2xl font-bold">{stats.totalStations.toLocaleString()}</div>}
-            <p className="text-xs text-muted-foreground">+20 since last month</p>
+            <div className="text-2xl font-bold">{stats.totalStations.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Live count from database</p>
           </CardContent>
         </Card>
         <Card>
@@ -130,18 +155,18 @@ export default function DashboardPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {loading ? <Skeleton className="h-8 w-24" /> : <div className="text-2xl font-bold">{stats.activeUsers.toLocaleString()}</div>}
-            <p className="text-xs text-muted-foreground">+180.1% from last month</p>
+            <div className="text-2xl font-bold">{stats.activeUsers.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">Total registered profiles</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Submissions</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
             <CheckCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {loading ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-bold">{stats.pendingSubmissions.toLocaleString()}</div>}
-            <p className="text-xs text-muted-foreground">+32 since last hour</p>
+            <div className="text-2xl font-bold">{stats.totalSubmissions.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground">All price reports received</p>
           </CardContent>
         </Card>
         <Card>
@@ -150,13 +175,15 @@ export default function DashboardPage() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {loading ? <Skeleton className="h-8 w-12" /> : <div className="text-2xl font-bold">{stats.reportsGenerated}</div>}
+            {/* This remains static until business logic for "reports" is defined */}
+            <div className="text-2xl font-bold">89</div>
             <p className="text-xs text-muted-foreground">+12 this week</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+        {/* --- Price Trend Chart Using Real Data --- */}
         <Card className="col-span-4">
           <CardHeader>
             <CardTitle>Average Price Trend (PMS)</CardTitle>
@@ -164,7 +191,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="pl-2">
             <ResponsiveContainer width="100%" height={350}>
-              <AreaChart data={chartData}>
+              <AreaChart data={priceTrendData}>
                 <defs>
                     <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
@@ -173,33 +200,27 @@ export default function DashboardPage() {
                 </defs>
                 <XAxis dataKey="month" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false}/>
                 <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `₦${value}`}/>
-                <Tooltip 
-                    contentStyle={{ 
-                        backgroundColor: 'hsl(var(--background))', 
-                        borderColor: 'hsl(var(--border))' 
-                    }}
-                />
+                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))' }}/>
                 <Area type="monotone" dataKey="price" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorPrice)" />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
+        
+        {/* --- Region Chart (Action Required) --- */}
         <Card className="col-span-4 lg:col-span-3">
           <CardHeader>
             <CardTitle>Price Submissions by Region</CardTitle>
-            <CardDescription>Most active regions for price submissions.</CardDescription>
+            <CardDescription>
+              Action Required: Add a 'state' column to your 'stations' table to enable this chart.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={350}>
                 <BarChart data={regionData}>
                     <XAxis dataKey="region" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false}/>
                     <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                    <Tooltip 
-                        contentStyle={{ 
-                            backgroundColor: 'hsl(var(--background))', 
-                            borderColor: 'hsl(var(--border))' 
-                        }}
-                    />
+                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))' }} />
                     <Bar dataKey="submissions" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                 </BarChart>
             </ResponsiveContainer>
@@ -207,6 +228,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* --- Recent Submissions Table Using Real Data --- */}
       <Card>
           <CardHeader>
             <CardTitle>Recent Price Submissions</CardTitle>
@@ -223,29 +245,17 @@ export default function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {loading ? (
-                    Array.from({length: 5}).map((_, i) => (
-                        <TableRow key={i}>
-                            <TableCell><Skeleton className="h-5 w-48" /></TableCell>
-                            <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                            <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
-                            <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                        </TableRow>
-                    ))
-                ) : (
-                    recentSubmissions.map((submission, index) => (
-                    <TableRow key={index}>
-                        <TableCell className="font-medium">{submission.station}</TableCell>
-                        <TableCell>₦{submission.price.toFixed(2)}</TableCell>
-                        <TableCell>
-                        <Badge variant={submission.status === 'Flagged' ? 'destructive' : submission.status === 'Pending' ? 'secondary' : 'default'}>
-                            {submission.status}
-                        </Badge>
-                        </TableCell>
-                        <TableCell>{submission.date}</TableCell>
-                    </TableRow>
-                    ))
-                )}
+                {recentSubmissions.map((submission, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">{submission.stationName}</TableCell>
+                    <TableCell>₦{submission.price.toFixed(2)}</TableCell>
+                    <TableCell>
+                      {/* Since there is no status column, we show a default badge */}
+                      <Badge variant={'outline'}>Logged</Badge>
+                    </TableCell>
+                    <TableCell>{submission.date}</TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </CardContent>
