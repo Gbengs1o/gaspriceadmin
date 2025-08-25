@@ -1,6 +1,8 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Fuel, Users, FileText, CheckCheck } from "lucide-react"
 import { Area, AreaChart, Bar, BarChart, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { format } from "date-fns" // A great library for formatting dates
@@ -139,47 +141,55 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-4">
       {/* --- Stat Cards Using Real Data --- */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Stations</CardTitle>
-            <Fuel className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalStations.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Live count from database</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.activeUsers.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Total registered profiles</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
-            <CheckCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalSubmissions.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">All price reports received</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Reports Generated</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {/* This remains static until business logic for "reports" is defined */}
-            <div className="text-2xl font-bold">89</div>
-            <p className="text-xs text-muted-foreground">+12 this week</p>
-          </CardContent>
-        </Card>
+        <Link href="/dashboard/stations">
+          <Card className="hover:bg-muted/50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Stations</CardTitle>
+              <Fuel className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalStations.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Live count from database</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/dashboard/users">
+          <Card className="hover:bg-muted/50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.activeUsers.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">Total registered profiles</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/dashboard/moderation">
+          <Card className="hover:bg-muted/50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Submissions</CardTitle>
+              <CheckCheck className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalSubmissions.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground">All price reports received</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/dashboard/reports">
+          <Card className="hover:bg-muted/50 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Reports Generated</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {/* This remains static until business logic for "reports" is defined */}
+              <div className="text-2xl font-bold">89</div>
+              <p className="text-xs text-muted-foreground">+12 this week</p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
