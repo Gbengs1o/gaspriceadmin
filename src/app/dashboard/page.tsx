@@ -42,7 +42,7 @@ interface Stats {
 }
 interface RecentSubmission {
   stationName: string;
-  price: number;
+  price: number | null;
   date: string;
 }
 interface MonthlyPrice {
@@ -248,7 +248,7 @@ export default function DashboardPage() {
                 {recentSubmissions.map((submission, index) => (
                   <TableRow key={index}>
                     <TableCell className="font-medium">{submission.stationName}</TableCell>
-                    <TableCell>₦{submission.price.toFixed(2)}</TableCell>
+                    <TableCell>{submission.price ? `₦${submission.price.toFixed(2)}` : 'N/A'}</TableCell>
                     <TableCell>
                       {/* Since there is no status column, we show a default badge */}
                       <Badge variant={'outline'}>Logged</Badge>
