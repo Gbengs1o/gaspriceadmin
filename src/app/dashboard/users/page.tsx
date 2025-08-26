@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import Image from "next/image"
 import { MoreHorizontal, PlusCircle, Search, User as UserIcon, Loader2, Mail, Phone } from "lucide-react"
 import { format, formatDistanceToNow } from "date-fns"
 import { supabase } from "@/lib/supabase"
@@ -15,8 +14,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-// Matches the return type of our new SQL function
 interface UserProfile {
   id: string;
   full_name: string | null;
@@ -39,15 +38,27 @@ export default function UsersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
 
+  // --- State for Search and Filters ---
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearchTerm = useDebounce(searchTerm, 400);
+  const [sortBy, setSortBy] = useState("newest");
+  const [providerFilter, setProviderFilter] = useState("all");
+  const [avatarFilter, setAvatarFilter] = useState("all");
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     const offset = (currentPage - 1) * USERS_PER_PAGE;
 
+    let hasAvatar: boolean | null = null;
+    if (avatarFilter === 'yes') hasAvatar = true;
+    if (avatarFilter === 'no') hasAvatar = false;
+
+    // --- UPDATED: Calling the RPC with all filter parameters ---
     const { data, error } = await supabase.rpc('get_users_for_admin_page', {
       _search_term: debouncedSearchTerm,
+      _sort_by: sortBy,
+      _provider_filter: providerFilter,
+      _has_avatar_filter: hasAvatar,
       _limit: USERS_PER_PAGE,
       _offset: offset,
     });
@@ -60,15 +71,16 @@ export default function UsersPage() {
       setTotalUsers(data && data.length > 0 ? data[0].total_count : 0);
     }
     setIsLoading(false);
-  }, [currentPage, debouncedSearchTerm, toast]);
+  }, [currentPage, debouncedSearchTerm, sortBy, providerFilter, avatarFilter, toast]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
   
+  // Reset to page 1 whenever a filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchTerm]);
+  }, [debouncedSearchTerm, sortBy, providerFilter, avatarFilter]);
 
   const totalPages = Math.ceil(totalUsers / USERS_PER_PAGE);
 
@@ -79,21 +91,38 @@ export default function UsersPage() {
             <h1 className="text-2xl font-bold tracking-tight">User Moderation</h1>
             <p className="text-muted-foreground">Manage user accounts and view their activity.</p>
         </div>
-        <Button disabled>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Invite User
-        </Button>
+        <Button disabled><PlusCircle className="mr-2 h-4 w-4" /> Invite User</Button>
       </div>
       <Card>
         <CardHeader className="border-b">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search by name, email, or phone..." 
-              className="pl-10" 
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)} 
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search by name, email, or phone..." 
+                className="pl-10" 
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)} 
+              />
+            </div>
+            {/* --- NEW: Filter and Sort Dropdowns --- */}
+            <Select value={providerFilter} onValueChange={setProviderFilter}>
+              <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Providers" /></SelectTrigger>
+              <SelectContent><SelectItem value="all">All Providers</SelectItem><SelectItem value="email">Email</SelectItem><SelectItem value="phone">Phone</SelectItem></SelectContent>
+            </Select>
+            <Select value={avatarFilter} onValueChange={setAvatarFilter}>
+              <SelectTrigger className="w-[180px]"><SelectValue placeholder="All Avatars" /></SelectTrigger>
+              <SelectContent><SelectItem value="all">All Avatars</SelectItem><SelectItem value="yes">Has Avatar</SelectItem><SelectItem value="no">No Avatar</SelectItem></SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[200px]"><SelectValue placeholder="Sort by..." /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Sort by: Newest</SelectItem>
+                <SelectItem value="oldest">Sort by: Oldest</SelectItem>
+                <SelectItem value="last_signin">Sort by: Last Sign In</SelectItem>
+                <SelectItem value="submissions_desc">Sort by: Most Submissions</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -117,11 +146,11 @@ export default function UsersPage() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar>
-                        <AvatarImage src={user.avatar_url || ''} alt={user.full_name || 'User'} />
+                        <AvatarImage src={user.avatar_url || ''} />
                         <AvatarFallback><UserIcon className="h-4 w-4" /></AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="font-medium">{user.full_name || user.email || user.phone || "N/A"}</div>
+                        <div className="font-medium">{user.full_name || "N/A"}</div>
                         <div className="text-sm text-muted-foreground">{user.email || user.phone}</div>
                       </div>
                     </div>
@@ -142,18 +171,15 @@ export default function UsersPage() {
                       <DropdownMenuTrigger asChild><Button size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem disabled>Edit User Details</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive" disabled>
-                          Suspend User
-                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled>Edit User</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" disabled>Suspend User</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
               ) : (
-                <TableRow><TableCell colSpan={6} className="h-24 text-center">No users found.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="h-24 text-center">No users found for the current filters.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
