@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react"
 import Image from "next/image"
-import { MoreHorizontal, PlusCircle, Search, User as UserIcon, Loader2 } from "lucide-react"
-import { format } from "date-fns"
+import { MoreHorizontal, PlusCircle, Search, User as UserIcon, Loader2, Mail, Phone } from "lucide-react"
+import { format, formatDistanceToNow } from "date-fns"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { useDebounce } from "@/hooks/use-debounce"
@@ -15,17 +15,19 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
-// This matches the return type of our new SQL function
+// Matches the return type of our new SQL function
 interface UserProfile {
   id: string;
   full_name: string | null;
   email: string | null;
   avatar_url: string | null;
-  phone_number: string | null;
+  phone: string | null;
   created_at: string;
+  last_sign_in_at: string | null;
+  provider: string;
   report_count: number;
+  total_count: number;
 }
 
 const USERS_PER_PAGE = 10;
@@ -40,13 +42,11 @@ export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearchTerm = useDebounce(searchTerm, 400);
 
-  const [userToSuspend, setUserToSuspend] = useState<UserProfile | null>(null);
-
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     const offset = (currentPage - 1) * USERS_PER_PAGE;
 
-    const { data, error } = await supabase.rpc('get_paginated_users_with_stats', {
+    const { data, error } = await supabase.rpc('get_users_for_admin_page', {
       _search_term: debouncedSearchTerm,
       _limit: USERS_PER_PAGE,
       _offset: offset,
@@ -70,30 +70,6 @@ export default function UsersPage() {
     setCurrentPage(1);
   }, [debouncedSearchTerm]);
 
-  // TODO: To enable this, add a 'status' column (e.g., TEXT) to your 'profiles' table.
-  const handleSuspendUser = async () => {
-    if (!userToSuspend) return;
-    toast({
-        title: "Feature In Development",
-        description: "Add a 'status' column to your profiles table to enable this."
-    });
-    setUserToSuspend(null);
-    /*
-    const { error } = await supabase
-        .from('profiles')
-        .update({ status: 'Suspended' }) // Assumes a 'status' column
-        .eq('id', userToSuspend.id);
-    
-    if (error) {
-        toast({ variant: "destructive", title: "Action Failed", description: error.message });
-    } else {
-        toast({ title: "User Suspended", description: `${userToSuspend.full_name} has been suspended.`});
-        fetchUsers();
-    }
-    setUserToSuspend(null);
-    */
-  };
-
   const totalPages = Math.ceil(totalUsers / USERS_PER_PAGE);
 
   return (
@@ -101,9 +77,9 @@ export default function UsersPage() {
       <div className="flex items-start justify-between">
         <div>
             <h1 className="text-2xl font-bold tracking-tight">User Moderation</h1>
-            <p className="text-muted-foreground">Manage user accounts and permissions.</p>
+            <p className="text-muted-foreground">Manage user accounts and view their activity.</p>
         </div>
-        <Button disabled> {/* TODO: Invite user logic */}
+        <Button disabled>
             <PlusCircle className="mr-2 h-4 w-4" />
             Invite User
         </Button>
@@ -113,7 +89,7 @@ export default function UsersPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search by name or email..." 
+              placeholder="Search by name, email, or phone..." 
               className="pl-10" 
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)} 
@@ -125,9 +101,9 @@ export default function UsersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>User</TableHead>
-                <TableHead>Phone Number</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Provider</TableHead>
                 <TableHead>Submissions</TableHead>
+                <TableHead>Last Sign In</TableHead>
                 <TableHead>Date Joined</TableHead>
                 <TableHead><span className="sr-only">Actions</span></TableHead>
               </TableRow>
@@ -145,27 +121,30 @@ export default function UsersPage() {
                         <AvatarFallback><UserIcon className="h-4 w-4" /></AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="font-medium">{user.full_name || "N/A"}</div>
-                        <div className="text-sm text-muted-foreground">{user.email}</div>
+                        <div className="font-medium">{user.full_name || user.email || user.phone || "N/A"}</div>
+                        <div className="text-sm text-muted-foreground">{user.email || user.phone}</div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>{user.phone_number || "N/A"}</TableCell>
                   <TableCell>
-                    {/* TODO: This is simulated. Add a 'status' column to the profiles table to make it real. */}
-                    <Badge variant="default">Active</Badge>
+                    <div className="flex items-center gap-2">
+                        {user.provider === 'email' ? <Mail className="h-4 w-4"/> : <Phone className="h-4 w-4"/>}
+                        <span className="capitalize">{user.provider}</span>
+                    </div>
                   </TableCell>
-                  <TableCell>{user.report_count.toLocaleString()}</TableCell>
-                  <TableCell>{format(new Date(user.created_at), "MMMM d, yyyy")}</TableCell>
+                  <TableCell className="font-medium text-center">{user.report_count.toLocaleString()}</TableCell>
+                  <TableCell>
+                    {user.last_sign_in_at ? `${formatDistanceToNow(new Date(user.last_sign_in_at))} ago` : 'Never'}
+                  </TableCell>
+                  <TableCell>{format(new Date(user.created_at), "d MMM, yyyy")}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild><Button size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem disabled>Edit User</DropdownMenuItem>
-                        <DropdownMenuItem disabled>Change Role</DropdownMenuItem>
+                        <DropdownMenuItem disabled>Edit User Details</DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive" onClick={() => setUserToSuspend(user)}>
+                        <DropdownMenuItem className="text-destructive" disabled>
                           Suspend User
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -189,21 +168,6 @@ export default function UsersPage() {
           </div>
         </CardFooter>
       </Card>
-      
-      <AlertDialog open={!!userToSuspend} onOpenChange={() => setUserToSuspend(null)}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Suspend User?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    Are you sure you want to suspend {userToSuspend?.full_name}? They will lose access to the app.
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={handleSuspendUser}>Suspend</AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
