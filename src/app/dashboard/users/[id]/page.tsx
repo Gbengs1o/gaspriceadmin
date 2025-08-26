@@ -27,7 +27,6 @@ interface PriceReport {
     id: number;
     created_at: string;
     price: number;
-    status: string;
     station_name: string;
 }
 
@@ -59,7 +58,7 @@ export default function UserDetailPage() {
             const reportsPromise = supabase
                 .from('price_reports')
                 .select(`
-                    id, created_at, price, status,
+                    id, created_at, price,
                     stations ( name )
                 `)
                 .eq('user_id', userId)
@@ -86,7 +85,6 @@ export default function UserDetailPage() {
                     id: r.id,
                     created_at: r.created_at,
                     price: r.price,
-                    status: r.status || 'N/A',
                     station_name: r.stations?.name || 'Unknown Station'
                 }))
                 setReports(formattedReports)
@@ -187,9 +185,7 @@ export default function UserDetailPage() {
                                         <TableCell className="font-medium">{report.station_name}</TableCell>
                                         <TableCell>₦{report.price.toFixed(2)}</TableCell>
                                         <TableCell>
-                                            <Badge variant={report.status === 'Flagged' ? 'destructive' : report.status === 'Pending' ? 'secondary' : 'default'}>
-                                                {report.status}
-                                            </Badge>
+                                            <Badge variant="outline">Logged</Badge>
                                         </TableCell>
                                         <TableCell>{format(new Date(report.created_at), "d MMM, h:mm a")}</TableCell>
                                     </TableRow>
