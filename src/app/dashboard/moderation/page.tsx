@@ -20,7 +20,7 @@ interface Submission {
   user_name: string | null;
   user_avatar: string | null;
   fuel_type: string;
-  submitted_price: number;
+  submitted_price: number | null;
   average_price: number | null;
   status: 'Pending' | 'Approved' | 'Rejected' | 'Flagged';
   created_at: string;
@@ -124,7 +124,9 @@ export default function ModerationPage() {
                                             </div>
                                         </TableCell>
                                         <TableCell>{item.fuel_type}</TableCell>
-                                        <TableCell className="font-bold">₦{item.submitted_price.toFixed(2)}</TableCell>
+                                        <TableCell className="font-bold">
+                                            {item.submitted_price ? `₦${item.submitted_price.toFixed(2)}` : 'N/A'}
+                                        </TableCell>
                                         <TableCell>
                                             {item.average_price ? `₦${item.average_price.toFixed(2)}` : 'N/A'}
                                         </TableCell>
