@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { MoreHorizontal, PlusCircle, Search, User as UserIcon, Loader2, Mail, Phone } from "lucide-react"
 import { format, formatDistanceToNow } from "date-fns"
 import { supabase } from "@/lib/supabase"
@@ -37,6 +38,7 @@ export default function UsersPage() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
+  const router = useRouter();
 
   // --- State for Search and Filters ---
   const [searchTerm, setSearchTerm] = useState("");
@@ -83,6 +85,16 @@ export default function UsersPage() {
   }, [debouncedSearchTerm, sortBy, providerFilter, avatarFilter]);
 
   const totalPages = Math.ceil(totalUsers / USERS_PER_PAGE);
+  
+  const handleRowClick = (userId: string, event: React.MouseEvent) => {
+    // Stop propagation if the click was on the dropdown menu trigger
+    const target = event.target as HTMLElement;
+    if (target.closest('[data-radix-dropdown-menu-trigger]')) {
+      return;
+    }
+    router.push(`/dashboard/users/${userId}`);
+  };
+
 
   return (
     <div className="flex flex-col gap-4">
@@ -142,7 +154,7 @@ export default function UsersPage() {
                 <TableRow><TableCell colSpan={6} className="h-48 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" /></TableCell></TableRow>
               ) : users.length > 0 ? (
                 users.map((user) => (
-                <TableRow key={user.id}>
+                <TableRow key={user.id} className="cursor-pointer" onClick={(e) => handleRowClick(user.id, e)}>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar>
