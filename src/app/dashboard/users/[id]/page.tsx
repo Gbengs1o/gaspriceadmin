@@ -26,7 +26,7 @@ interface UserProfile {
 interface PriceReport {
     id: number;
     created_at: string;
-    price: number;
+    price: number | null;
     station_name: string;
 }
 
@@ -183,7 +183,7 @@ export default function UserDetailPage() {
                                 {reports.length > 0 ? reports.map((report) => (
                                     <TableRow key={report.id}>
                                         <TableCell className="font-medium">{report.station_name}</TableCell>
-                                        <TableCell>₦{report.price.toFixed(2)}</TableCell>
+                                        <TableCell>{report.price ? `₦${report.price.toFixed(2)}` : 'N/A'}</TableCell>
                                         <TableCell>
                                             <Badge variant="outline">Logged</Badge>
                                         </TableCell>
