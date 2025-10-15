@@ -73,7 +73,7 @@ export default function DashboardLayout({
           <div className="flex items-center gap-2">
             <Logo className="h-8 w-auto text-primary" />
             <h1 className="text-xl font-semibold font-headline text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-              GasPrice NG
+              FYND FUEL
             </h1>
           </div>
         </SidebarHeader>
@@ -104,7 +104,7 @@ export default function DashboardLayout({
                     </Avatar>
                     <div className="group-data-[collapsible=icon]:hidden">
                       <p className="text-sm font-medium text-sidebar-foreground">Admin User</p>
-                      <p className="text-xs text-sidebar-foreground/70">admin@gasprice.ng</p>
+                      <p className="text-xs text-sidebar-foreground/70">admin@fyndfuel.com</p>
                     </div>
                 </div>
               </DropdownMenuTrigger>

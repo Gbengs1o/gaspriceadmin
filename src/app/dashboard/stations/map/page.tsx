@@ -123,7 +123,7 @@ export default function StationsMapPage() {
                         defaultZoom={6}
                         gestureHandling={'greedy'}
                         disableDefaultUI={false}
-                        mapId="gasprice-nigeria-admin-map"
+                        mapId="fynd-fuel-admin-map"
                         streetViewControl={false}
                         fullscreenControl={false}
                     >

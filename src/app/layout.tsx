@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'GasPrice Nigeria Admin',
-  description: 'Admin dashboard for GasPrice Nigeria',
+  title: 'FYND FUEL Admin',
+  description: 'Admin dashboard for FYND FUEL',
 };
 
 export default function RootLayout({

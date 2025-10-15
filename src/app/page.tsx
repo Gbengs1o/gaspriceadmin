@@ -58,7 +58,7 @@ export default function LoginPage() {
           <div className="mx-auto mb-4">
             <Logo className="h-16 w-auto" />
           </div>
-          <CardTitle className="text-2xl font-headline">GasPrice Nigeria Admin</CardTitle>
+          <CardTitle className="text-2xl font-headline">FYND FUEL</CardTitle>
           <CardDescription>Enter your credentials to access the dashboard</CardDescription>
         </CardHeader>
         <CardContent>
@@ -71,7 +71,7 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="admin@gasprice.ng" {...field} />
+                      <Input placeholder="admin@fyndfuel.com" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
