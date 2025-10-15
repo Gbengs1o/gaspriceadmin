@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -76,8 +75,11 @@ export default function DashboardPage() {
 
       const priceTrendPromise = supabase.rpc('get_monthly_avg_price');
       
-      // --- NEW: Fetching Data for the Region Chart ---
-      const regionSubmissionsPromise = supabase.rpc('get_weekly_submissions_by_state');
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const regionSubmissionsPromise = supabase
+        .from('price_reports')
+        .select('stations ( state )')
+        .gte('created_at', sevenDaysAgo);
 
 
       const [
@@ -122,11 +124,23 @@ export default function DashboardPage() {
       if (trendError) console.error("Error fetching price trend:", trendError.message);
 
       if (regionChartData) {
-        setRegionData(regionChartData);
+        const counts = regionChartData
+          .filter(r => r.stations?.state)
+          .reduce((acc: Record<string, number>, report: any) => {
+            const state = report.stations.state;
+            acc[state] = (acc[state] || 0) + 1;
+            return acc;
+        }, {});
+
+        const sortedData = Object.entries(counts)
+            .map(([state, submissions]) => ({ state, submissions }))
+            .sort((a, b) => b.submissions - a.submissions)
+            .slice(0, 10); // Get top 10
+
+        setRegionData(sortedData);
       }
       if (regionChartError) {
         console.error("Error fetching region data:", regionChartError.message);
-        // Keep the chart empty on error
         setRegionData([]);
       }
       
