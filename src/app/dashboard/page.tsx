@@ -4,10 +4,9 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Fuel, Users, FileText, CheckCheck } from "lucide-react"
-import { Area, AreaChart, Bar, BarChart, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
-import { format } from "date-fns" // A great library for formatting dates
+import { Area, AreaChart, Bar, BarChart, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts"
+import { format } from "date-fns" 
 
-// 1. Make sure you have a Supabase client file at this path
 import { supabase } from "@/lib/supabase"
 
 import {
@@ -26,15 +25,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Loader2 } from "lucide-react"
 
-// --- Mock Data for the Region Chart (until you add a 'state' column) ---
-const regionData = [
-    { region: "Lagos", submissions: 45 },
-    { region: "Abuja", submissions: 32 },
-    { region: "Kano", submissions: 28 },
-    { region: "Rivers", submissions: 38 },
-    { region: "Oyo", submissions: 22 },
-]
 
 // --- Define Types for our Fetched Data ---
 interface Stats {
@@ -51,26 +43,27 @@ interface MonthlyPrice {
   month: string;
   price: number;
 }
+interface RegionSubmission {
+    state: string;
+    submissions: number;
+}
 
 
 export default function DashboardPage() {
-  // 2. State variables to hold real data and loading status
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<Stats | null>(null);
   const [recentSubmissions, setRecentSubmissions] = useState<RecentSubmission[]>([]);
   const [priceTrendData, setPriceTrendData] = useState<MonthlyPrice[]>([]);
+  const [regionData, setRegionData] = useState<RegionSubmission[]>([]);
 
-  // 3. useEffect to fetch all dashboard data on component load
   useEffect(() => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       
-      // --- Fetching Data for the Stat Cards ---
       const stationCountPromise = supabase.from('stations').select('*', { count: 'exact', head: true });
       const userCountPromise = supabase.from('profiles').select('*', { count: 'exact', head: true });
       const submissionCountPromise = supabase.from('price_reports').select('*', { count: 'exact', head: true });
 
-      // --- Fetching Data for the Recent Submissions Table ---
       const recentSubmissionsPromise = supabase
         .from('price_reports')
         .select(`
@@ -81,25 +74,28 @@ export default function DashboardPage() {
         .order('created_at', { ascending: false })
         .limit(5);
 
-      // --- Fetching Data for the Price Trend Chart via RPC ---
       const priceTrendPromise = supabase.rpc('get_monthly_avg_price');
+      
+      // --- NEW: Fetching Data for the Region Chart ---
+      const regionSubmissionsPromise = supabase.rpc('get_weekly_submissions_by_state');
 
-      // --- Run all queries in parallel for speed ---
+
       const [
         { count: stationCount },
         { count: userCount },
         { count: submissionCount },
         { data: submissionsData, error: submissionsError },
-        { data: trendData, error: trendError }
+        { data: trendData, error: trendError },
+        { data: regionChartData, error: regionChartError }
       ] = await Promise.all([
         stationCountPromise,
         userCountPromise,
         submissionCountPromise,
         recentSubmissionsPromise,
-        priceTrendPromise
+        priceTrendPromise,
+        regionSubmissionsPromise
       ]);
 
-      // --- Process and set state for all fetched data ---
       setStats({
         totalStations: stationCount ?? 0,
         activeUsers: userCount ?? 0,
@@ -124,17 +120,29 @@ export default function DashboardPage() {
         setPriceTrendData(formattedTrendData);
       }
       if (trendError) console.error("Error fetching price trend:", trendError.message);
+
+      if (regionChartData) {
+        setRegionData(regionChartData);
+      }
+      if (regionChartError) {
+        console.error("Error fetching region data:", regionChartError.message);
+        // Keep the chart empty on error
+        setRegionData([]);
+      }
       
       setIsLoading(false);
     };
 
     fetchDashboardData();
-  }, []); // Empty dependency array means this runs once on mount
+  }, []); 
 
 
-  // 4. Render a loading state while fetching data
   if (isLoading || !stats) {
-    return <div className="p-4">Loading Dashboard...</div>;
+    return (
+        <div className="flex h-full w-full items-center justify-center p-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    );
   }
 
   return (
@@ -193,7 +201,6 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        {/* --- Price Trend Chart Using Real Data --- */}
         <Card className="col-span-4">
           <CardHeader>
             <CardTitle>Average Price Trend (PMS)</CardTitle>
@@ -211,34 +218,40 @@ export default function DashboardPage() {
                 <XAxis dataKey="month" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false}/>
                 <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `₦${value}`}/>
                 <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))' }}/>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
                 <Area type="monotone" dataKey="price" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorPrice)" />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
         
-        {/* --- Region Chart (Action Required) --- */}
         <Card className="col-span-4 lg:col-span-3">
           <CardHeader>
-            <CardTitle>Price Submissions by Region</CardTitle>
+            <CardTitle>Weekly Submissions by State</CardTitle>
             <CardDescription>
-              Action Required: Add a 'state' column to your 'stations' table to enable this chart.
+              {regionData.length > 0 ? "Top states by user price submissions in the last 7 days." : "No submission data for the last 7 days."}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={regionData}>
-                    <XAxis dataKey="region" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false}/>
-                    <YAxis stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))' }} />
-                    <Bar dataKey="submissions" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
+                {regionData.length > 0 ? (
+                    <BarChart data={regionData} layout="vertical">
+                        <XAxis type="number" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} hide />
+                        <YAxis type="category" dataKey="state" stroke="hsl(var(--foreground))" fontSize={12} tickLine={false} axisLine={false} width={80} />
+                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))' }} cursor={{ fill: 'hsl(var(--accent))' }}/>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" horizontal={false} />
+                        <Bar dataKey="submissions" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                        No recent submission data to display.
+                    </div>
+                )}
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      {/* --- Recent Submissions Table Using Real Data --- */}
       <Card>
           <CardHeader>
             <CardTitle>Recent Price Submissions</CardTitle>
@@ -260,7 +273,6 @@ export default function DashboardPage() {
                     <TableCell className="font-medium">{submission.stationName}</TableCell>
                     <TableCell>{submission.price ? `₦${submission.price.toFixed(2)}` : 'N/A'}</TableCell>
                     <TableCell>
-                      {/* Since there is no status column, we show a default badge */}
                       <Badge variant={'outline'}>Logged</Badge>
                     </TableCell>
                     <TableCell>{submission.date}</TableCell>
